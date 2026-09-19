@@ -1,7 +1,7 @@
 -- acompanhamento_rh_test.sql
--- Testes executáveis da feature 002 (TDD). SQL puro, sem extensão: roda no runner
--- local (scripts/test-db.sh) e também no SQL Editor do Supabase.
--- Isolado por transação com rollback.
+-- Testes da feature 002. SQL puro (sem comandos do psql), roda no Supabase SQL Editor
+-- e no runner local (scripts/test-db.sh). Isolado por transação com rollback.
+-- No Supabase, cole o arquivo inteiro e execute (uma vez).
 
 begin;
 
@@ -14,124 +14,93 @@ begin
 end;
 $$;
 
--- ---------------------------------------------------------------- setup
-select public.criar_funcionario('RH0001', 'RH Teste', 'Coordenacao', 'rhsenha') as rh_id \gset
-update public.funcionarios set is_rh = true, perfil = 'rh' where matricula = 'RH0001';
-
-select public.criar_funcionario('EST001', 'Estagiaria Teste', 'Estagiaria', 'estsenha') as est_id \gset
-update public.funcionarios set jornada_minutos = 240 where matricula = 'EST001';
-
-select public.criar_funcionario('EST002', 'Pendente Teste', 'Estagiaria', 'pendsenha') as est2_id \gset
-
-select (public.login('RH0001', 'rhsenha') ->> 'token') as rh_token \gset
-select (public.login('EST001', 'estsenha') ->> 'token') as est_token \gset
-
--- Disponibiliza os valores para uso dentro de blocos DO (dollar-quoted).
-select
-  set_config('test.rh_token',  :'rh_token',  false),
-  set_config('test.est_token', :'est_token', false),
-  set_config('test.est_id',    :'est_id',    false),
-  set_config('test.est2_id',   :'est2_id',   false);
-
--- EST001: 08:00-12:00 e 13:00-17:00 (refeição de 1h entre os pares)
-insert into public.registros(funcionario_id, tipo, timestamp_utc, timezone, origem) values
-  (:'est_id'::uuid, 'entrada', (public.hoje_sp() + time '08:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste'),
-  (:'est_id'::uuid, 'saida',   (public.hoje_sp() + time '12:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste'),
-  (:'est_id'::uuid, 'entrada', (public.hoje_sp() + time '13:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste'),
-  (:'est_id'::uuid, 'saida',   (public.hoje_sp() + time '17:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste');
-
--- EST002: apenas entrada hoje (dia incompleto)
-insert into public.registros(funcionario_id, tipo, timestamp_utc, timezone, origem) values
-  (:'est2_id'::uuid, 'entrada', (public.hoje_sp() + time '09:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste');
-
--- ------------------------------------------------- T004 (evoluído pela 003): escopo
--- Com perfis (feature 003), o painel é escopado ao ator: trabalhador vê apenas a si.
-do $$ declare r json; begin
-  r := public.acompanhamento_periodo(current_setting('test.est_token')::uuid,
-                                     public.hoje_sp(), public.hoje_sp(), null);
-  perform pg_temp.assert_true(json_array_length(r) = 1, 'trabalhador deve ver apenas a si no painel');
-  perform pg_temp.assert_true((r->0->>'matricula') = 'EST001', 'trabalhador ve o proprio registro');
-end $$;
-
--- ---------------------------------------------------------------- T005/T009/T010: agregação
 do $$
 declare
-  r json;
-  e json;
-  total int;
-  desvio int;
-  pend json;
+  v_rh uuid; v_est uuid; v_est2 uuid;
+  v_rh_token uuid; v_est_token uuid;
+  v_r json; v_e json; v_pend json;
+  v_total int; v_desvio int; v_n int; v_dow int; v_hoje date;
+  v_ok boolean;
 begin
-  r := public.acompanhamento_periodo(current_setting('test.rh_token')::uuid,
-                                     public.hoje_sp(),
-                                     public.hoje_sp(), null);
+  -- ---------------------------------------------------------------- setup
+  v_rh := public.criar_funcionario('RH0001', 'RH Teste', 'Coordenacao', 'rhsenha');
+  update public.funcionarios set is_rh = true, perfil = 'rh' where id = v_rh;
 
-  select value into e from json_array_elements(r) where value->>'matricula' = 'EST001';
-  perform pg_temp.assert_true(e is not null, 'EST001 presente no painel');
+  v_est := public.criar_funcionario('EST001', 'Estagiaria Teste', 'Estagiaria', 'estsenha');
+  update public.funcionarios set jornada_minutos = 240 where id = v_est;
 
-  total := (e->>'total_minutos')::int;
-  perform pg_temp.assert_true(total = 480, 'total deve ser 480 min (refeicao excluida), veio ' || total);
+  v_est2 := public.criar_funcionario('EST002', 'Pendente Teste', 'Estagiaria', 'pendsenha');
 
-  perform pg_temp.assert_true((e->>'jornada_minutos')::int = 240, 'jornada da estagiaria = 240');
-  desvio := (e->>'desvio_minutos')::int;
-  perform pg_temp.assert_true(desvio = 240, 'desvio = 480 - 240 = 240, veio ' || desvio);
-  perform pg_temp.assert_true((e->>'presenca') = 'saida', 'presenca derivada = saida');
+  v_rh_token := (public.login('RH0001', 'rhsenha') ->> 'token')::uuid;
+  v_est_token := (public.login('EST001', 'estsenha') ->> 'token')::uuid;
 
-  pend := e->'dias_pendentes';
-  perform pg_temp.assert_true(json_array_length(pend) = 0, 'dia completo nao deve ter pendencia');
-end $$;
+  -- EST001: 08:00-12:00 e 13:00-17:00 (refeição de 1h entre os pares)
+  insert into public.registros(funcionario_id, tipo, timestamp_utc, timezone, origem) values
+    (v_est, 'entrada', (public.hoje_sp() + time '08:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste'),
+    (v_est, 'saida',   (public.hoje_sp() + time '12:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste'),
+    (v_est, 'entrada', (public.hoje_sp() + time '13:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste'),
+    (v_est, 'saida',   (public.hoje_sp() + time '17:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste');
 
--- ---------------------------------------------------------------- T009: pendência (dia incompleto)
-do $$
-declare
-  r json;
-  e json;
-  hoje date := public.hoje_sp();
-  dow int := extract(isodow from hoje);
-  n int;
-begin
-  r := public.acompanhamento_periodo(current_setting('test.rh_token')::uuid, hoje, hoje, null);
-  select value into e from json_array_elements(r) where value->>'matricula' = 'EST002';
-  perform pg_temp.assert_true(e is not null, 'EST002 presente no painel');
-  perform pg_temp.assert_true((e->>'total_minutos')::int = 0, 'EST002 sem par completo = 0 min');
-  perform pg_temp.assert_true((e->>'presenca') = 'entrada', 'EST002 em atividade');
-  n := json_array_length(e->'dias_pendentes');
-  if dow between 1 and 5 then
-    perform pg_temp.assert_true(n = 1, 'dia util incompleto deve ter 1 pendencia');
+  -- EST002: apenas entrada hoje (dia incompleto)
+  insert into public.registros(funcionario_id, tipo, timestamp_utc, timezone, origem) values
+    (v_est2, 'entrada', (public.hoje_sp() + time '09:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste');
+
+  -- --------------------------------------------- T004 (evoluído pela 003): escopo
+  v_r := public.acompanhamento_periodo(v_est_token, public.hoje_sp(), public.hoje_sp(), null);
+  perform pg_temp.assert_true(json_array_length(v_r) = 1, 'trabalhador deve ver apenas a si no painel');
+  perform pg_temp.assert_true((v_r -> 0 ->> 'matricula') = 'EST001', 'trabalhador ve o proprio registro');
+
+  -- ---------------------------------------------------------------- agregação
+  v_r := public.acompanhamento_periodo(v_rh_token, public.hoje_sp(), public.hoje_sp(), null);
+
+  select value into v_e from json_array_elements(v_r) where value ->> 'matricula' = 'EST001';
+  perform pg_temp.assert_true(v_e is not null, 'EST001 presente no painel');
+
+  v_total := (v_e ->> 'total_minutos')::int;
+  perform pg_temp.assert_true(v_total = 480, 'total deve ser 480 min (refeicao excluida), veio ' || v_total);
+  perform pg_temp.assert_true((v_e ->> 'jornada_minutos')::int = 240, 'jornada da estagiaria = 240');
+
+  v_desvio := (v_e ->> 'desvio_minutos')::int;
+  perform pg_temp.assert_true(v_desvio = 240, 'desvio = 480 - 240 = 240, veio ' || v_desvio);
+  perform pg_temp.assert_true((v_e ->> 'presenca') = 'saida', 'presenca derivada = saida');
+
+  v_pend := v_e -> 'dias_pendentes';
+  perform pg_temp.assert_true(json_array_length(v_pend) = 0, 'dia completo nao deve ter pendencia');
+
+  -- ---------------------------------------------------------------- pendência
+  v_hoje := public.hoje_sp();
+  v_dow := extract(isodow from v_hoje);
+
+  v_r := public.acompanhamento_periodo(v_rh_token, v_hoje, v_hoje, null);
+  select value into v_e from json_array_elements(v_r) where value ->> 'matricula' = 'EST002';
+  perform pg_temp.assert_true(v_e is not null, 'EST002 presente no painel');
+  perform pg_temp.assert_true((v_e ->> 'total_minutos')::int = 0, 'EST002 sem par completo = 0 min');
+  perform pg_temp.assert_true((v_e ->> 'presenca') = 'entrada', 'EST002 em atividade');
+
+  v_n := json_array_length(v_e -> 'dias_pendentes');
+  if v_dow between 1 and 5 then
+    perform pg_temp.assert_true(v_n = 1, 'dia util incompleto deve ter 1 pendencia');
   else
-    perform pg_temp.assert_true(n = 0, 'fim de semana nao conta pendencia');
+    perform pg_temp.assert_true(v_n = 0, 'fim de semana nao conta pendencia');
   end if;
-end $$;
 
--- ---------------------------------------------------------------- T006: período inválido
-do $$ declare ok boolean := false; begin
+  -- ---------------------------------------------------------------- período inválido
+  v_ok := false;
   begin
-    perform public.acompanhamento_periodo(current_setting('test.rh_token')::uuid,
-                                           public.hoje_sp(), public.hoje_sp() - 1, null);
+    perform public.acompanhamento_periodo(v_rh_token, public.hoje_sp(), public.hoje_sp() - 1, null);
   exception when others then
-    ok := (sqlerrm like '%periodo_invalido%');
+    v_ok := (sqlerrm like '%periodo_invalido%');
   end;
-  perform pg_temp.assert_true(ok, 'periodo com fim antes do inicio deve falhar');
-end $$;
+  perform pg_temp.assert_true(v_ok, 'periodo com fim antes do inicio deve falhar');
 
--- ---------------------------------------------------------------- T013: detalhe
-do $$
-declare r json;
-begin
-  r := public.registros_funcionario_periodo(current_setting('test.rh_token')::uuid,
-                                            current_setting('test.est_id')::uuid,
-                                            public.hoje_sp(), public.hoje_sp());
-  perform pg_temp.assert_true(json_array_length(r->'registros') = 4, 'detalhe deve listar 4 registros');
-  perform pg_temp.assert_true((r->'funcionario'->>'nome') = 'Estagiaria Teste', 'detalhe traz o funcionario');
-end $$;
+  -- ---------------------------------------------------------------- detalhe
+  v_r := public.registros_funcionario_periodo(v_rh_token, v_est, public.hoje_sp(), public.hoje_sp());
+  perform pg_temp.assert_true(json_array_length(v_r -> 'registros') = 4, 'detalhe deve listar 4 registros');
+  perform pg_temp.assert_true((v_r -> 'funcionario' ->> 'nome') = 'Estagiaria Teste', 'detalhe traz o funcionario');
 
--- ---------------------------------------------------------------- filtro por função
-do $$
-declare r json;
-begin
-  r := public.acompanhamento_periodo(current_setting('test.rh_token')::uuid,
-                                     public.hoje_sp(), public.hoje_sp(), 'Inexistente');
-  perform pg_temp.assert_true(json_array_length(r) = 0, 'filtro por funcao inexistente deve ser vazio');
+  -- ---------------------------------------------------------------- filtro por função
+  v_r := public.acompanhamento_periodo(v_rh_token, public.hoje_sp(), public.hoje_sp(), 'Inexistente');
+  perform pg_temp.assert_true(json_array_length(v_r) = 0, 'filtro por funcao inexistente deve ser vazio');
 end $$;
 
 select 'TODOS OS TESTES PASSARAM' as resultado;
