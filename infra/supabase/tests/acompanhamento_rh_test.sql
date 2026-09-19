@@ -16,7 +16,7 @@ $$;
 
 -- ---------------------------------------------------------------- setup
 select public.criar_funcionario('RH0001', 'RH Teste', 'Coordenacao', 'rhsenha') as rh_id \gset
-update public.funcionarios set is_rh = true where matricula = 'RH0001';
+update public.funcionarios set is_rh = true, perfil = 'rh' where matricula = 'RH0001';
 
 select public.criar_funcionario('EST001', 'Estagiaria Teste', 'Estagiaria', 'estsenha') as est_id \gset
 update public.funcionarios set jornada_minutos = 240 where matricula = 'EST001';
@@ -44,15 +44,13 @@ insert into public.registros(funcionario_id, tipo, timestamp_utc, timezone, orig
 insert into public.registros(funcionario_id, tipo, timestamp_utc, timezone, origem) values
   (:'est2_id'::uuid, 'entrada', (public.hoje_sp() + time '09:00') at time zone 'America/Sao_Paulo', 'America/Sao_Paulo', 'teste');
 
--- ---------------------------------------------------------------- T004: autorização
-do $$ declare ok boolean := false; begin
-  begin
-    perform public.acompanhamento_periodo(current_setting('test.est_token')::uuid,
-                                           public.hoje_sp(), public.hoje_sp(), null);
-  exception when others then
-    ok := (sqlerrm like '%sem_permissao%');
-  end;
-  perform pg_temp.assert_true(ok, 'nao-RH deve receber sem_permissao');
+-- ------------------------------------------------- T004 (evoluído pela 003): escopo
+-- Com perfis (feature 003), o painel é escopado ao ator: trabalhador vê apenas a si.
+do $$ declare r json; begin
+  r := public.acompanhamento_periodo(current_setting('test.est_token')::uuid,
+                                     public.hoje_sp(), public.hoje_sp(), null);
+  perform pg_temp.assert_true(json_array_length(r) = 1, 'trabalhador deve ver apenas a si no painel');
+  perform pg_temp.assert_true((r->0->>'matricula') = 'EST001', 'trabalhador ve o proprio registro');
 end $$;
 
 -- ---------------------------------------------------------------- T005/T009/T010: agregação

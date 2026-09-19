@@ -77,15 +77,33 @@ Testes executáveis em SQL puro (sem extensão):
 bash scripts/test-db.sh
 ```
 
-O runner sobe um Postgres efêmero, aplica as migrations e roda
-`infra/supabase/tests/acompanhamento_rh_test.sql` (autorização, agregação, refeição
-excluída, pendências, período inválido e detalhe). No Supabase, o mesmo arquivo roda no
-SQL Editor (isolado por `rollback`).
+O runner sobe um Postgres efêmero, aplica as migrations e roda as suítes
+`acompanhamento_rh_test.sql` (002) e `perfis_permissoes_test.sql` (003) — cobrindo
+agregação, refeição excluída, pendências, escopo por perfil, soft delete, auditoria
+antes/depois e administração de perfis. No Supabase, os mesmos arquivos rodam no
+SQL Editor (isolados por `rollback`).
 
-## 8. Pendências
+## 8. Perfis e permissões (feature 003)
+
+Aplicar `0006_perfis.sql` e `0007_functions_perfis.sql`. Perfis: `trabalhador` (só os
+próprios), `coordenador` (sua área via `coordenador_id`), `rh` (coordenação e abaixo),
+`diretoria` (todos). `is_rh` migra para `perfil = 'rh'`.
+
+| RPC | Para quem | Efeito |
+|-----|-----------|--------|
+| `perfil_atual` | todos | perfil + tamanho do escopo |
+| `acompanhamento_periodo` | todos (escopado) | totais/pendências do escopo |
+| `registros_funcionario_periodo` | escopo | detalhe somente leitura |
+| `admin_atualizar_perfil` | diretoria + RH | perfil/área/coordenação (valida ciclo) |
+| `excluir_registro` | diretoria | soft delete com auditoria antes/depois |
+
+Exclusão é **lógica** (`excluido = true`); toda alteração registra `entidade`,
+`antes`/`depois`, autor e data em `auditoria`.
+
+## 9. Pendências
 
 - 🔴 Definir/armazenar credenciais do Supabase no `index.html` (`window.PONTO_CONFIG`).
-- 🔴 RBAC completo (hoje só `is_rh`); evoluir quando houver demanda.
+- 🔴 UI de administração de perfis (hoje via RPC) e edição de áreas.
 - 🔴 Política de retenção e base legal LGPD (feature `persistencia-lgpd`).
 
 ---

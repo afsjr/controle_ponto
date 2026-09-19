@@ -33,13 +33,20 @@ for f in \
   infra/supabase/migrations/0001_init.sql \
   infra/supabase/migrations/0002_functions.sql \
   infra/supabase/migrations/0004_rh.sql \
-  infra/supabase/migrations/0005_functions_rh.sql
+  infra/supabase/migrations/0005_functions_rh.sql \
+  infra/supabase/migrations/0006_perfis.sql \
+  infra/supabase/migrations/0007_functions_perfis.sql
 do
   echo "==> aplicando $f"
   psql -d ponto_test -v ON_ERROR_STOP=1 -q -f "$ROOT/$f"
 done
 
-echo "==> rodando testes"
-psql -d ponto_test -v ON_ERROR_STOP=1 -f "$ROOT/infra/supabase/tests/acompanhamento_rh_test.sql"
+for t in \
+  infra/supabase/tests/acompanhamento_rh_test.sql \
+  infra/supabase/tests/perfis_permissoes_test.sql
+do
+  echo "==> rodando $t"
+  psql -d ponto_test -v ON_ERROR_STOP=1 -f "$ROOT/$t"
+done
 
 echo "==> OK"

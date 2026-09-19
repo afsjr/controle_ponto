@@ -105,6 +105,11 @@
     if (m.includes('sem_entrada_aberta')) return 'Não há entrada aberta para registrar a saída.';
     if (m.includes('nao_autenticado')) return 'Sessão expirada. Informe matrícula e senha novamente.';
     if (m.includes('tipo_invalido')) return 'Tipo de registro inválido.';
+    if (m.includes('sem_permissao')) return 'Você não tem permissão para esta ação.';
+    if (m.includes('ciclo_hierarquia')) return 'Hierarquia inválida: criaria um ciclo.';
+    if (m.includes('perfil_invalido')) return 'Perfil inválido.';
+    if (m.includes('registro_inexistente')) return 'Registro inexistente.';
+    if (m.includes('funcionario_inexistente')) return 'Funcionário inexistente.';
     if (m.includes('sem_config')) return 'Modo servidor não configurado.';
     if (/fetch|network|failed to fetch|load failed|timeout/i.test(m)) return 'Servidor indisponível. Tente novamente.';
     return 'Não foi possível concluir: ' + m;
@@ -123,10 +128,11 @@
     if (!matricula || !senha) { showToast('Informe matrícula e senha.', 'error'); return; }
     try {
       const r = await rpcCall('login', { p_matricula: matricula, p_senha: senha });
-      sessaoRh = { token: r.token, nome: r.funcionario.nome };
+      sessaoRh = { token: r.token, nome: r.funcionario.nome, perfil: null };
+      try { const p = await rpcCall('perfil_atual', { p_token: r.token }); sessaoRh.perfil = p.perfil; sessionStorage.setItem('pontoPerfil', p.perfil); } catch (e) { sessaoRh.perfil = null; }
       qs('#rh-login-panel').style.display = 'none';
       qs('#rh-panel').style.display = '';
-      showToast(`Bem-vindo, ${sessaoRh.nome}.`);
+      showToast(`Bem-vindo, ${sessaoRh.nome}${sessaoRh.perfil ? ' · ' + sessaoRh.perfil : ''}.`);
       await renderAcompanhamento();
     } catch (e) { showToast(erroAmigavel(e), 'error'); }
   }
