@@ -1,0 +1,11 @@
+# Não publicar estes itens no deploy estático da Vercel.
+# (O .gitignore já mantém .claude/, .agents/, .reversa/, _reversa_* fora do repo.)
+
+# Backend/infra, scripts e documentação interna
+infra/
+scripts/
+docs/
+
+# Contexto de IA e credenciais locais
+AGENTS.md
+CREDENCIAIS.local.md
