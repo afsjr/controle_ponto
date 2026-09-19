@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090909" />
+    <title>CSM · Controle de jornada</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="ponto-enhancements.css" />
+    <link rel="stylesheet" href="brand.css" />
+    <link rel="stylesheet" href="brand-refinement.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><img class="brand-logo" src="logo-csm.png" alt="Colégio Santa Mônica" /><div class="brand-caption"><strong>Controle de jornada</strong><span>Ambiente administrativo</span></div></div>
+        <div class="workspace-label">VISÃO GERAL</div>
+        <nav class="main-nav" aria-label="Navegação principal">
+          <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span>Dashboard</button>
+          <button class="nav-item" data-view="ponto"><span class="nav-icon">◷</span>Registrar ponto</button>
+          <button class="nav-item" data-view="trabalhadores"><span class="nav-icon">♙</span>Trabalhadores</button>
+          <button class="nav-item" data-view="auditoria"><span class="nav-icon">✓</span>Auditoria</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="security-card"><span class="security-dot"></span><div><b>Dados protegidos</b><small>Registros não são apagados</small></div></div>
+          <div class="user-mini"><div class="avatar avatar-admin">MC</div><div><b>Marina Costa</b><small>Administradora</small></div><span class="more">•••</span></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar"><div class="mobile-brand"><span class="mobile-brand-mark">CSM</span><strong>Controle de jornada</strong></div><div class="topbar-actions"><span class="live-dot"></span><span class="live-label">Sistema online</span><button class="icon-button" aria-label="Notificações">♢<i>3</i></button><button class="avatar avatar-admin">MC</button></div></header>
+
+        <section class="view active" id="view-dashboard">
+          <div class="page-heading"><div><p class="eyebrow">QUINTA-FEIRA, 17 DE SETEMBRO DE 2026</p><h1>Bom dia, Marina <span class="wave">✦</span></h1><p class="subtitle">Acompanhe a jornada da sua equipe em tempo real.</p></div><button class="button button-primary" data-action="go-ponto">+ Registrar ponto</button></div>
+          <div class="stats-grid" id="stats-grid"></div>
+          <div class="dashboard-grid"><section class="panel panel-live"><div class="panel-heading"><div><h2>Equipe agora</h2><p>Presença em tempo real</p></div><span class="status-pill green"><span></span>Atualizado agora</span></div><div id="presence-list" class="presence-list"></div><button class="text-button" data-action="go-trabalhadores">Ver todos os trabalhadores <span>→</span></button></section><section class="panel"><div class="panel-heading"><div><h2>Desvios de jornada</h2><p>Requerem atenção do administrador</p></div><span class="count-badge" id="alert-count">0</span></div><div id="alerts-list" class="alerts-list"></div><button class="text-button" data-action="go-auditoria">Abrir central de auditoria <span>→</span></button></section></div>
+          <section class="panel activity-panel"><div class="panel-heading"><div><h2>Atividade recente</h2><p>Últimos registros realizados</p></div><button class="filter-button" data-action="go-auditoria">Ver auditoria completa <span>→</span></button></div><div id="activity-table"></div></section>
+        </section>
+
+        <section class="view" id="view-ponto"><div class="page-heading"><div><p class="eyebrow">TERMINAL COMPARTILHADO</p><h1>Registrar ponto</h1><p class="subtitle">Cada trabalhador informa seu código e escolhe o tipo de registro.</p></div><div class="date-chip">17 set 2026 <span>•</span> <b id="clock">--:--:--</b></div></div><div class="ponto-layout"><section class="panel punch-panel"><div class="punch-orb">◷</div><h2>Seu registro de jornada</h2><p class="punch-help">Preencha os dados abaixo e salve. A tela ficará pronta para a próxima pessoa.</p><form id="punch-form"><div class="form-field punch-code-field"><label for="punch-code">Código do trabalhador</label><div class="code-input-wrap"><span>#</span><input id="punch-code" name="code" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required /></div><small>Use o código único de 6 dígitos.</small></div><div class="form-field"><label for="punch-senha">Senha</label><div class="code-input-wrap"><span>•</span><input id="punch-senha" name="senha" type="password" autocomplete="off" placeholder="Sua senha" /></div><small>Necessária no modo servidor. No modo local, deixe em branco.</small></div><div class="form-field"><label>O que deseja registrar?</label><div class="punch-type-options"><label class="punch-type selected" data-type="in"><input type="radio" name="type" value="in" checked /><span class="type-symbol">↗</span><span><b>Entrada</b><small>Início da jornada</small></span></label><label class="punch-type" data-type="out"><input type="radio" name="type" value="out" /><span class="type-symbol">↙</span><span><b>Saída</b><small>Fim da jornada</small></span></label></div></div><button class="button button-primary full" id="punch-submit" type="submit">Salvar registro <span>→</span></button></form><div class="success-card" id="punch-success" aria-live="polite"><span>✓</span><div><b>Registro salvo com sucesso!</b><small id="punch-success-message"></small></div></div><p class="privacy-note">Os registros são permanentes e ficam disponíveis para auditoria.</p></section><section class="panel instruction-panel"><div class="panel-heading"><div><h2>Dados para teste</h2><p>Mockados para validação inicial</p></div><span class="status-pill green"><span></span>Ambiente de teste</span></div><div class="mock-list"><button class="mock-worker" data-mock-code="218406"><span class="person-avatar" style="background:#edf2ff;color:#5271c9">AB</span><span><b>Ana Beatriz Lima</b><small>Entrada ou saída · <strong>218406</strong></small></span><span>→</span></button><button class="mock-worker" data-mock-code="491827"><span class="person-avatar" style="background:#f7edff;color:#9466c2">CE</span><span><b>Carlos Eduardo Souza</b><small>Entrada ou saída · <strong>491827</strong></small></span><span>→</span></button><button class="mock-worker" data-mock-code="735102"><span class="person-avatar" style="background:#fff1e8;color:#c87547">JM</span><span><b>Juliana Martins</b><small>Entrada ou saída · <strong>735102</strong></small></span><span>→</span></button></div><div class="steps compact-steps"><div class="step"><span>01</span><div><b>Identificação</b><p>Informe seu código pessoal de 6 dígitos.</p></div></div><div class="step"><span>02</span><div><b>Escolha o tipo</b><p>Selecione entrada ou saída conforme sua jornada.</p></div></div><div class="step"><span>03</span><div><b>Salvar e liberar</b><p>Após a confirmação, o formulário é limpo para o próximo.</p></div></div></div><div class="tip-box"><span>✦</span><div><b>Importante</b><p>Se precisar corrigir um registro, use a Central de auditoria com uma justificativa.</p></div></div></section></div></section>
+
+        <section class="view" id="view-trabalhadores"><div class="page-heading"><div><p class="eyebrow">ADMINISTRAÇÃO</p><h1>Trabalhadores</h1><p class="subtitle">Cadastre e acompanhe os códigos de acesso da equipe.</p></div><button class="button button-primary" data-action="open-worker-modal">+ Novo trabalhador</button></div><section class="panel"><div class="toolbar"><div class="search-box"><span>⌕</span><input id="worker-search" placeholder="Buscar por nome ou código..." /></div><span class="toolbar-label" id="worker-total"></span></div><div id="workers-table"></div></section></section>
+
+        <section class="view" id="view-auditoria"><div class="page-heading"><div><p class="eyebrow">CONTROLE E CONFORMIDADE</p><h1>Central de auditoria</h1><p class="subtitle">Toda alteração é registrada com autoria, data e justificativa.</p></div><span class="audit-lock">⌾ Registros imutáveis</span></div><section class="audit-summary" id="audit-summary"></section><section class="panel"><div class="toolbar"><div><h2>Histórico de registros</h2><p class="toolbar-subtitle">Eventos originais e correções vinculadas</p></div><select id="audit-filter"><option value="all">Todos os eventos</option><option value="correction">Somente correções</option><option value="punch">Somente registros de ponto</option></select></div><div id="audit-table"></div></section></section>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <div class="modal-backdrop" id="modal-backdrop"><div class="modal" id="modal-content"></div></div>
+    <script>
+      window.PONTO_CONFIG = { url: "", anonKey: "", timezone: "America/Sao_Paulo" };
+    </script>
+    <script src="app.js"></script>
+  </body>
+</html>

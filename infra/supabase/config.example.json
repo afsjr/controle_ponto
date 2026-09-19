@@ -1,0 +1,6 @@
+{
+  "_comentario": "Modelo de configuração. NÃO versione credenciais reais. A anon key é pública, mas trate como segredo operacional.",
+  "url": "https://SEU-PROJETO.supabase.co",
+  "anonKey": "SUA-ANON-KEY",
+  "timezone": "America/Sao_Paulo"
+}
