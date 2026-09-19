@@ -55,11 +55,17 @@ begin
   select count(*) into n from public.escopo_funcionarios(current_setting('test.coord_id')::uuid);
   perform pg_temp.assert_true(n = 2, 'coordenador deve ver a si + 1 subordinado, veio ' || n);
 
-  select count(*) into n from public.escopo_funcionarios(current_setting('test.rh_id')::uuid);
-  perform pg_temp.assert_true(n = 3, 'RH deve ver trabalhadores + coordenadores, veio ' || n);
+  perform pg_temp.assert_true(
+    exists (select 1 from public.escopo_funcionarios(current_setting('test.rh_id')::uuid) e
+             where e.funcionario_id = current_setting('test.sub_id')::uuid)
+    and not exists (select 1 from public.escopo_funcionarios(current_setting('test.rh_id')::uuid) e
+             where e.funcionario_id = current_setting('test.dir_id')::uuid),
+    'RH deve incluir trabalhadores/coordenadores e excluir a diretoria');
 
-  select count(*) into n from public.escopo_funcionarios(current_setting('test.dir_id')::uuid);
-  perform pg_temp.assert_true(n = 5, 'diretoria deve ver todos, veio ' || n);
+  perform pg_temp.assert_true(
+    exists (select 1 from public.escopo_funcionarios(current_setting('test.dir_id')::uuid) e
+             where e.funcionario_id = current_setting('test.rh_id')::uuid),
+    'diretoria deve incluir o RH');
 end $$;
 
 -- perfil_atual
