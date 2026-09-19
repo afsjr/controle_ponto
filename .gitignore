@@ -26,3 +26,10 @@ npm-debug.log*
 .env
 .env.*
 !.env.example
+
+# Credenciais de teste (nunca versionar)
+CREDENCIAIS*
+credenciais*
+*.local.md
+*.local.txt
+*.local.json

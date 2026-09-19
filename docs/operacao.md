@@ -55,12 +55,39 @@ SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/migracao.js base.json
 Mapeamento: `code`→`matricula`, `name`→`nome`, `role`→`funcao`; registros com
 `timestamp`→`timestamp_utc`. Correções ficam para uma feature futura.
 
-## 6. Pendências
+## 6. Painel do RH (feature 002 — acompanhamento-rh)
 
-- 🔴 Frontend ainda não migrado para as RPCs (T018/T020/T021): ações em `actions.md`.
-- 🔴 Definir/armazenar credenciais do Supabase (config local).
+Aplicar também `infra/supabase/migrations/0004_rh.sql` e `0005_functions_rh.sql`. Eles
+adicionam `funcionarios.is_rh` / `jornada_minutos` e as RPCs do painel:
+
+| RPC | Entrada | Saída |
+|-----|---------|-------|
+| `acompanhamento_periodo` | `token`, `inicio`, `fim`, `funcao` | lista com total, presença, pendências e desvio |
+| `registros_funcionario_periodo` | `token`, `funcionario_id`, `inicio`, `fim` | registros do funcionário (somente leitura) |
+
+- Autorização: quem não tem `is_rh` recebe `sem_permissao`.
+- Jornada: 240/360 min (estagiárias) e 480 min (demais). Refeição de 1h não é contada.
+- No app, a view **Acompanhamento** pede matrícula e senha do RH e exibe o mês corrente.
+
+## 7. Testes (TDD)
+
+Testes executáveis em SQL puro (sem extensão):
+
+```
+bash scripts/test-db.sh
+```
+
+O runner sobe um Postgres efêmero, aplica as migrations e roda
+`infra/supabase/tests/acompanhamento_rh_test.sql` (autorização, agregação, refeição
+excluída, pendências, período inválido e detalhe). No Supabase, o mesmo arquivo roda no
+SQL Editor (isolado por `rollback`).
+
+## 8. Pendências
+
+- 🔴 Definir/armazenar credenciais do Supabase no `index.html` (`window.PONTO_CONFIG`).
+- 🔴 RBAC completo (hoje só `is_rh`); evoluir quando houver demanda.
 - 🔴 Política de retenção e base legal LGPD (feature `persistencia-lgpd`).
 
 ---
 
-Gerado por reversa-coding em 2026-09-18.
+Gerado por reversa-coding em 2026-09-18 · Atualizado para a feature 002 em 2026-09-19.

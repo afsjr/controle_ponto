@@ -62,7 +62,7 @@
   function tableHtml(rs, mode){ if(!rs.length)return '<div class="empty-state">Nenhum registro encontrado.</div>'; return `<div class="table-wrap"><table class="data-table"><thead><tr><th>Trabalhador</th><th>Tipo</th><th>Data e hora</th><th>Origem</th>${mode==='audit'?'<th></th>':''}</tr></thead><tbody>${rs.map(r=>{const w=worker(r.workerId), e=effective(r);return `<tr><td><b>${escape(w?.name||'—')}</b><br><span class="muted">${w?.code||''}</span></td><td><span class="type-badge ${e.corrected?'type-correction':e.type==='in'?'type-in':'type-out'}">${e.corrected?'CORRIGIDO':e.type==='in'?'ENTRADA':'SAÍDA'}</span></td><td>${fmtDate(e.timestamp)} <b>${fmtTime(e.timestamp)}</b>${e.corrected?'<br><span class="muted">original: '+fmtTime(r.timestamp)+'</span>':''}</td><td>${e.corrected?'Admin · justificativa':'Terminal numérico'}</td>${mode==='audit'?`<td>${e.corrected?'<span class="muted">Correção registrada</span>':`<button class="correction-link" data-action="open-correction" data-id="${r.id}">Corrigir com justificativa</button>`}</td>`:''}</tr>`}).join('')}</tbody></table></div>`; }
   function renderWorkers(){const query=(qs('#worker-search')?.value||'').toLowerCase(); const ws=state.workers.filter(w=>`${w.name} ${w.code} ${w.role}`.toLowerCase().includes(query)); qs('#worker-total').textContent=`${state.workers.length} cadastrados`; qs('#workers-table').innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Trabalhador</th><th>Código único</th><th>Jornada hoje</th><th>Status</th><th>Cadastro</th></tr></thead><tbody>${ws.map((w,i)=>`<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="person-avatar" style="background:${colors[i%colors.length].bg};color:${colors[i%colors.length].fg};margin:0">${initials(w.name)}</div><div><b>${escape(w.name)}</b><br><span class="muted">${escape(w.role)}</span></div></div></td><td><span class="highlight">${w.code}</span></td><td>${duration(minutesWorked(w.id))}</td><td><span class="status-pill ${isClockedIn(w.id)?'green':''}" style="display:inline-flex">${isClockedIn(w.id)?'<span></span>Em atividade':'Fora do expediente'}</span></td><td>${fmtDate(w.createdAt)}</td></tr>`).join('')}</tbody></table></div>`;}
   function renderAudit(){const corrections=state.corrections.length, original=state.records.length; qs('#audit-summary').innerHTML=`<div class="stat-card"><span class="stat-icon">⌁</span><div class="stat-label">Eventos registrados</div><div class="stat-value">${original+corrections}</div><div class="stat-note">Originais + correções</div></div><div class="stat-card"><span class="stat-icon">✓</span><div class="stat-label">Correções justificadas</div><div class="stat-value">${corrections}</div><div class="stat-note">Nunca removidas</div></div><div class="stat-card"><span class="stat-icon">◉</span><div class="stat-label">Taxa de integridade</div><div class="stat-value">100%</div><div class="stat-note positive">Trilha de auditoria ativa</div></div>`; const filter=qs('#audit-filter')?.value||'all'; let rs=[...state.records].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)); if(filter==='correction')rs=rs.filter(r=>state.corrections.some(c=>c.recordId===r.id)); if(filter==='punch')rs=rs.filter(r=>!state.corrections.some(c=>c.recordId===r.id)); qs('#audit-table').innerHTML=tableHtml(rs,'audit');}
-  function render(){const active=qs('.view.active')?.id.replace('view-','')||'dashboard'; if(active==='dashboard')renderDashboard(); if(active==='trabalhadores')renderWorkers(); if(active==='auditoria')renderAudit(); updateClock();}
+  function render(){const active=qs('.view.active')?.id.replace('view-','')||'dashboard'; if(active==='dashboard')renderDashboard(); if(active==='trabalhadores')renderWorkers(); if(active==='auditoria')renderAudit(); if(active==='acompanhamento')renderAcompanhamento(); updateClock();}
   function updateClock(){const now=new Date(); qs('#clock').textContent=now.toLocaleTimeString('pt-BR');}
   function openModal(content){qs('#modal-content').innerHTML=content;qs('#modal-backdrop').classList.add('show');}
   function closeModal(){qs('#modal-backdrop').classList.remove('show');}
@@ -72,6 +72,7 @@
   const CLOUD = !!(CFG.url && CFG.anonKey);
   let sb = null;
   let sessao = null;
+  let sessaoRh = null;
   async function cloudClient() {
     if (!CLOUD) return null;
     if (sb) return sb;
@@ -108,6 +109,53 @@
     if (/fetch|network|failed to fetch|load failed|timeout/i.test(m)) return 'Servidor indisponível. Tente novamente.';
     return 'Não foi possível concluir: ' + m;
   };
+  const fmtMesAtual = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+  const inicioFimMes = (valor) => {
+    const [y, m] = valor.split('-').map(Number);
+    const iso = d => d.toISOString().slice(0, 10);
+    return { inicio: iso(new Date(Date.UTC(y, m - 1, 1))), fim: iso(new Date(Date.UTC(y, m, 0))) };
+  };
+  async function rhLogin(event) {
+    if (event) event.preventDefault();
+    if (!CLOUD) { showToast('Painel disponível apenas no modo servidor.', 'error'); return; }
+    const matricula = (qs('#rh-matricula').value || '').trim();
+    const senha = (qs('#rh-senha').value || '').trim();
+    if (!matricula || !senha) { showToast('Informe matrícula e senha.', 'error'); return; }
+    try {
+      const r = await rpcCall('login', { p_matricula: matricula, p_senha: senha });
+      sessaoRh = { token: r.token, nome: r.funcionario.nome };
+      qs('#rh-login-panel').style.display = 'none';
+      qs('#rh-panel').style.display = '';
+      showToast(`Bem-vindo, ${sessaoRh.nome}.`);
+      await renderAcompanhamento();
+    } catch (e) { showToast(erroAmigavel(e), 'error'); }
+  }
+  async function renderAcompanhamento() {
+    const box = qs('#rh-tabela');
+    if (!box) return;
+    if (!CLOUD) { qs('#rh-login-panel').style.display = 'none'; qs('#rh-panel').style.display = ''; box.innerHTML = '<div class="empty-state">Painel disponível apenas no modo servidor (preencha window.PONTO_CONFIG).</div>'; return; }
+    if (!sessaoRh) { qs('#rh-login-panel').style.display = ''; qs('#rh-panel').style.display = 'none'; return; }
+    const mes = qs('#rh-mes').value || fmtMesAtual();
+    const { inicio, fim } = inicioFimMes(mes);
+    const funcao = (qs('#rh-funcao').value || '').trim() || null;
+    qs('#rh-periodo-chip').textContent = `${inicio} → ${fim}`;
+    box.innerHTML = '<div class="empty-state">Carregando...</div>';
+    try {
+      const rows = await rpcCall('acompanhamento_periodo', { p_token: sessaoRh.token, p_inicio: inicio, p_fim: fim, p_funcao: funcao });
+      if (!rows || !rows.length) { box.innerHTML = '<div class="empty-state">Nenhum registro no período.</div>'; return; }
+      box.innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>Funcionário</th><th>Função</th><th>Total</th><th>Presença</th><th>Pendências</th><th>Desvio</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td><b>${escape(r.nome)}</b><br><span class="muted">${escape(r.matricula)}</span></td><td>${escape(r.funcao)}</td><td>${duration(r.total_minutos)}</td><td>${r.presenca === 'entrada' ? 'Em atividade' : 'Fora'}</td><td>${(r.dias_pendentes || []).length}</td><td>${r.desvio_minutos > 0 ? '+' : ''}${duration(Math.abs(r.desvio_minutos))}</td><td><button class="correction-link" data-action="rh-detalhe" data-id="${r.funcionario_id}">Ver registros</button></td></tr>`).join('')}</tbody></table></div>`;
+    } catch (e) { box.innerHTML = `<div class="empty-state">${escape(erroAmigavel(e))}</div>`; }
+  }
+  async function rhDetalhe(id) {
+    if (!sessaoRh) return;
+    try {
+      const mes = qs('#rh-mes').value || fmtMesAtual();
+      const { inicio, fim } = inicioFimMes(mes);
+      const r = await rpcCall('registros_funcionario_periodo', { p_token: sessaoRh.token, p_funcionario_id: id, p_inicio: inicio, p_fim: fim });
+      const regs = (r && r.registros) || [];
+      openModal(`<div class="modal-header"><div><h2>${escape((r && r.funcionario && r.funcionario.nome) || 'Registros')}</h2><p>Somente leitura · ${inicio} a ${fim}</p></div><button class="close-modal" data-action="close-modal">×</button></div>` + (regs.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Tipo</th><th>Data e hora</th></tr></thead><tbody>${regs.map(x => `<tr><td>${x.tipo === 'entrada' ? 'ENTRADA' : 'SAÍDA'}</td><td>${fmtDate(x.timestamp_utc)} <b>${fmtTime(x.timestamp_utc)}</b></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-state">Sem registros no período.</div>'));
+    } catch (e) { showToast(erroAmigavel(e), 'error'); }
+  }
   async function submitPunchCloud(form) {
     const data = Object.fromEntries(new FormData(form));
     const matricula = (data.code || '').trim();
@@ -139,6 +187,6 @@
   }
   function submitPunch(event){if(event)event.preventDefault();const form=qs('#punch-form');if(!form)return;if(CLOUD)return submitPunchCloud(form);const data=Object.fromEntries(new FormData(form));const code=(data.code||'').trim();const w=state.workers.find(x=>x.code===code);if(!w){showToast('Código não encontrado. Confira os 6 dígitos e tente novamente.','error');qs('#punch-code').focus();return;}const type=data.type;if(type==='in'&&isClockedIn(w.id)){showToast(`${w.name} já possui uma entrada aberta. Registre a saída ou corrija pela auditoria.`,'error');return;}if(type==='out'&&!isClockedIn(w.id)){showToast(`${w.name} não possui uma entrada aberta para registrar saída.`,'error');return;}const now=new Date().toISOString();state.records.push({id:`r${Date.now()}`,workerId:w.id,type,timestamp:now,createdAt:now,createdBy:'Terminal compartilhado'});save();form.reset();qs('.punch-type[data-type="in"]').classList.add('selected');qsa('.punch-type[data-type="out"]').forEach(x=>x.classList.remove('selected'));qs('#punch-success-message').textContent=`${w.name} · ${type==='in'?'Entrada':'Saída'} às ${fmtTime(now)}. Próximo trabalhador pode registrar.`;qs('#punch-success').classList.add('show');qs('#punch-code').focus();showToast('Registro salvo com sucesso.');render();}
   function initPunchForm(){qs('#punch-form').addEventListener('submit',submitPunch);qs('#punch-code').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,6);});qsa('.punch-type').forEach(option=>option.addEventListener('click',()=>{qsa('.punch-type').forEach(x=>x.classList.remove('selected'));option.classList.add('selected');option.querySelector('input').checked=true;}));qsa('.mock-worker').forEach(button=>button.addEventListener('click',()=>{qs('#punch-code').value=button.dataset.mockCode;qs('#punch-code').focus();showToast('Código de teste preenchido. Escolha entrada ou saída.');}));}
-  document.addEventListener('click',e=>{const nav=e.target.closest('[data-view]');if(nav)navigate(nav.dataset.view);const action=e.target.closest('[data-action]');if(!action)return;const a=action.dataset.action;if(a==='go-ponto')navigate('ponto');if(a==='go-trabalhadores')navigate('trabalhadores');if(a==='go-auditoria')navigate('auditoria');if(a==='open-worker-modal')openWorkerModal();if(a==='open-correction')openCorrection(action.dataset.id);if(a==='close-modal')closeModal();});
-  initPunchForm(); qs('#worker-search').addEventListener('input',renderWorkers); qs('#audit-filter').addEventListener('change',renderAudit); qs('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal();}); render(); setInterval(updateClock,1000); setInterval(render,60000);
+  document.addEventListener('click',e=>{const nav=e.target.closest('[data-view]');if(nav)navigate(nav.dataset.view);const action=e.target.closest('[data-action]');if(!action)return;const a=action.dataset.action;if(a==='go-ponto')navigate('ponto');if(a==='go-trabalhadores')navigate('trabalhadores');if(a==='go-auditoria')navigate('auditoria');if(a==='open-worker-modal')openWorkerModal();if(a==='open-correction')openCorrection(action.dataset.id);if(a==='rh-detalhe')rhDetalhe(action.dataset.id);if(a==='close-modal')closeModal();});
+  initPunchForm(); { const rhForm=qs('#rh-login-form'); if(rhForm)rhForm.addEventListener('submit',rhLogin); const rhMes=qs('#rh-mes'); if(rhMes){rhMes.value=fmtMesAtual(); rhMes.addEventListener('change',renderAcompanhamento);} const rhBtn=qs('#rh-atualizar'); if(rhBtn)rhBtn.addEventListener('click',renderAcompanhamento); } qs('#worker-search').addEventListener('input',renderWorkers); qs('#audit-filter').addEventListener('change',renderAudit); qs('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal();}); render(); setInterval(updateClock,1000); setInterval(render,60000);
 })();
