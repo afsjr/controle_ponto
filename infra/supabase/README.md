@@ -10,8 +10,7 @@ infra/supabase/
 ├── config.example.json            # modelo de credenciais (URL + anon key)
 ├── migrations/
 │   ├── 0001_init.sql              # tabelas, índices, constraints, RLS/revokes
-│   ├── 0002_functions.sql         # RPCs: login, registrar_ponto, registros_hoje, etc.
-│   └── 0003_seed.sql              # funcionários de teste (senha padrão "ponto123")
+│   └── 0002_functions.sql         # RPCs: login, registrar_ponto, registros_hoje, etc.
 └── tests/
     └── registro_ponto_test.sql    # testes pgTAP (ainda NÃO executados)
 ```
@@ -20,8 +19,7 @@ infra/supabase/
 
 1. Crie um projeto no Supabase (Região South America / São Paulo é a mais próxima).
 2. No **SQL Editor** do projeto, execute, nesta ordem: `0001_init.sql`, `0002_functions.sql`.
-3. Em desenvolvimento, execute também `0003_seed.sql`.
-4. Copie `config.example.json` para um local que seu frontend consiga ler e preencha
+3. Copie `config.example.json` para um local que seu frontend consiga ler e preencha
    `url` e `anonKey` (a anon key é pública, mas ainda assim evite versioná-la).
 
 ## Segurança

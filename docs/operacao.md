@@ -17,7 +17,6 @@ Frontend (index.html/app.js)  --RPC-->  Supabase (Postgres + pgcrypto)
 1. Criar o projeto (região São Paulo).
 2. SQL Editor → rodar `infra/supabase/migrations/0001_init.sql`.
 3. SQL Editor → rodar `infra/supabase/migrations/0002_functions.sql`.
-4. (Dev) rodar `0003_seed.sql` — cria funcionários de teste com senha `ponto123`.
 
 ## 3. RPCs disponíveis
 

@@ -13,8 +13,7 @@ No painel: **Project Settings → API**. Copie:
 ## 2. Preparar o banco (SQL Editor do Supabase)
 
 1. Cole e execute **`infra/supabase/apply_all.sql`** (tabelas + funções). Idempotente.
-2. *(dev)* Cole e execute **`infra/supabase/migrations/0003_seed.sql`** (dados de teste, senha `ponto123`).
-3. Confira (deve retornar 9 linhas):
+2. Confira (deve retornar 9 linhas):
 
 ```sql
 select proname from pg_proc where proname in

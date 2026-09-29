@@ -1,7 +1,6 @@
 -- apply_all.sql — aplica todas as migrations de schema/funções (SEM seed).
 -- Ordem: 0001 -> 0002 -> 0004 -> 0005 -> 0006 -> 0007
 -- Rode no SQL Editor do Supabase. Idempotente (pode reexecutar).
--- Para dados de teste, rode também 0003_seed.sql.
 
 
 -- ============================================================
