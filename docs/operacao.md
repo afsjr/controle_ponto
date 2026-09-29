@@ -77,16 +77,17 @@ bash scripts/test-db.sh
 ```
 
 O runner sobe um Postgres efêmero, aplica as migrations e roda as suítes
-`acompanhamento_rh_test.sql` (002) e `perfis_permissoes_test.sql` (003) — cobrindo
-agregação, refeição excluída, pendências, escopo por perfil, soft delete, auditoria
-antes/depois e administração de perfis. No Supabase, os mesmos arquivos rodam no
+`acompanhamento_rh_test.sql` (002), `perfis_permissoes_test.sql` (003) e
+`admin_criar_funcionario_test.sql` (003) — cobrindo agregação, refeição excluída,
+pendências, escopo por perfil, soft delete, auditoria antes/depois, administração de
+perfis e cadastro de funcionário com senha. No Supabase, os mesmos arquivos rodam no
 SQL Editor (isolados por `rollback`).
 
 ## 8. Perfis e permissões (feature 003)
 
-Aplicar `0006_perfis.sql` e `0007_functions_perfis.sql`. Perfis: `trabalhador` (só os
-próprios), `coordenador` (sua área via `coordenador_id`), `rh` (coordenação e abaixo),
-`diretoria` (todos). `is_rh` migra para `perfil = 'rh'`.
+Aplicar `0006_perfis.sql`, `0007_functions_perfis.sql` e `0008_admin_criar_funcionario.sql`.
+Perfis: `trabalhador` (só os próprios), `coordenador` (sua área via `coordenador_id`),
+`rh` (coordenação e abaixo), `diretoria` (todos). `is_rh` migra para `perfil = 'rh'`.
 
 | RPC | Para quem | Efeito |
 |-----|-----------|--------|
@@ -94,6 +95,7 @@ próprios), `coordenador` (sua área via `coordenador_id`), `rh` (coordenação 
 | `acompanhamento_periodo` | todos (escopado) | totais/pendências do escopo |
 | `registros_funcionario_periodo` | escopo | detalhe somente leitura |
 | `admin_atualizar_perfil` | diretoria + RH | perfil/área/coordenação (valida ciclo) |
+| `admin_criar_funcionario` | diretoria + RH | cadastra funcionário com senha (bcrypt) e perfil |
 | `excluir_registro` | diretoria | soft delete com auditoria antes/depois |
 
 Exclusão é **lógica** (`excluido = true`); toda alteração registra `entidade`,
@@ -102,7 +104,7 @@ Exclusão é **lógica** (`excluido = true`); toda alteração registra `entidad
 ## 9. Pendências
 
 - 🔴 Definir/armazenar credenciais do Supabase no `index.html` (`window.PONTO_CONFIG`).
-- 🔴 UI de administração de perfis (hoje via RPC) e edição de áreas.
+- 🔴 UI de edição de perfil/área (o cadastro com senha já está na tela **Trabalhadores**, logado como RH/diretoria).
 - 🔴 Política de retenção e base legal LGPD (feature `persistencia-lgpd`).
 
 ---

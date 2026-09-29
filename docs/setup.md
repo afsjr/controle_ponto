@@ -13,13 +13,13 @@ No painel: **Project Settings → API**. Copie:
 ## 2. Preparar o banco (SQL Editor do Supabase)
 
 1. Cole e execute **`infra/supabase/apply_all.sql`** (tabelas + funções). Idempotente.
-2. Confira (deve retornar 9 linhas):
+2. Confira (deve retornar 10 linhas):
 
 ```sql
 select proname from pg_proc where proname in
 ('login','registrar_ponto','registros_hoje','acompanhamento_periodo',
  'registros_funcionario_periodo','perfil_atual','admin_atualizar_perfil',
- 'excluir_registro','escopo_funcionarios');
+ 'admin_criar_funcionario','excluir_registro','escopo_funcionarios');
 ```
 
 ## 3. Configurar o app (`index.html`)
@@ -50,10 +50,11 @@ Abra `http://localhost:8080`.
 
 ## 5. Testar
 
-- **Registrar ponto (terminal):** matrícula `218406` / senha `ponto123` → **Entrada** → confirmação com nome e horário. Repita escolhendo **Saída**.
-- **Acompanhamento:** `305671` / `ponto123` (Coordenação → perfil `rh`) → painel com totais e pendências.
-- Se aparecer "sem permissão", ajuste o perfil:
-  `update public.funcionarios set perfil='rh' where matricula='305671';`
+1. **Cadastrar um trabalhador:** tela **Trabalhadores** → *Novo trabalhador* (informe nome, função, matrícula de 6 dígitos e senha). Exige estar logado no **Acompanhamento** com perfil `rh` ou `diretoria`; a senha é gravada com hash.
+2. **Registrar ponto (terminal):** informe a matrícula e a senha cadastradas → **Entrada** → confirmação com nome e horário. Repita escolhendo **Saída**.
+3. **Acompanhamento:** entre com a matrícula/senha de um perfil `rh` ou `diretoria`.
+4. Se aparecer "sem permissão", ajuste o perfil:
+   `update public.funcionarios set perfil='rh' where matricula='000000';`
 
 ## 6. Deploy na Vercel
 
@@ -73,6 +74,7 @@ Os testes também rodam no SQL Editor do Supabase (SQL puro, com `rollback`):
 
 - `infra/supabase/tests/acompanhamento_rh_test.sql`
 - `infra/supabase/tests/perfis_permissoes_test.sql`
+- `infra/supabase/tests/admin_criar_funcionario_test.sql`
 
 ## 8. Perfis e permissões
 
